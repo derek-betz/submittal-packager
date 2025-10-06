@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Submittal Validation Report</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; }
+    .status-ok { color: #2e7d32; }
+    .status-warn { color: #f9a825; }
+    .status-error { color: #c62828; }
+    table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+    th, td { border: 1px solid #ccc; padding: 0.5rem; }
+    th { background-color: #f5f5f5; }
+    details { margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>Submittal Validation Report</h1>
+  <p><strong>Project:</strong> {{ project.designation }} – {{ project.project_name }}</p>
+  <p><strong>Stage:</strong> {{ stage }}</p>
+  <p><strong>Generated:</strong> {{ generated_at }}</p>
+
+  <section>
+    <h2>Summary</h2>
+    <p class="status-ok">Files: {{ totals.files }}</p>
+    <p class="status-ok">Pages: {{ totals.pages }}</p>
+    <p class="status-ok">Checksum Algorithm: {{ checksum_algo }}</p>
+  </section>
+
+  <section>
+    <h2>Messages</h2>
+    <details open>
+      <summary class="status-error">Errors ({{ errors|length }})</summary>
+      <ul>
+      {% for err in errors %}
+        <li>{{ err }}</li>
+      {% endfor %}
+      </ul>
+    </details>
+    <details open>
+      <summary class="status-warn">Warnings ({{ warnings|length }})</summary>
+      <ul>
+      {% for warn in warnings %}
+        <li>{{ warn }}</li>
+      {% endfor %}
+      </ul>
+    </details>
+  </section>
+
+  <section>
+    <h2>Files</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>File</th>
+          <th>Pages</th>
+          <th>Discipline</th>
+          <th>Sheet Type</th>
+          <th>Sheets</th>
+          <th>Checksum</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for item in files %}
+        <tr>
+          <td>{{ item.relative_path }}</td>
+          <td>{{ item.pages }}</td>
+          <td>{{ item.discipline or '' }}</td>
+          <td>{{ item.sheet_type or '' }}</td>
+          <td>{{ item.sheet_start }}{% if item.sheet_end %}-{{ item.sheet_end }}{% endif %}</td>
+          <td>{{ item.checksum }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</body>
+</html>

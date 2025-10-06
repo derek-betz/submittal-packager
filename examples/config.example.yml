@@ -1,0 +1,71 @@
+project:
+  designation: "Des 2401490"
+  route: "SR 14"
+  project_name: "SR 14 HMA Overlay & Culvert Replacements"
+  consultant: "Your Firm, Inc."
+  contact: "Jane Doe, PE <jdoe@firm.com>"
+  stage: "Stage2"
+conventions:
+  filename_pattern: "{des}_{stage}_{discipline}_{sheet_type}_{sheet_range}.{ext}"
+  regex: "^(?P<des>\\d{7})_(?P<stage>Stage[123]|Final)_(?P<discipline>[A-Z]+)_(?P<sheet_type>[A-Za-z0-9]+)_(?P<sheet_range>\\d+(?:-\\d+)?)\\.(?P<ext>pdf|docx)$"
+  stage_case_insensitive: true
+  allow_spaces: false
+  allowed_extensions: ["pdf", "docx"]
+stages:
+  Stage1:
+    required:
+      - key: "title_sheet"
+        pattern: "*TITLE*.pdf"
+      - key: "index_sheet"
+        pattern: "*INDEX*.pdf"
+      - key: "plans_general"
+        pattern: "*PLANS*.pdf"
+  Stage2:
+    required:
+      - key: "title_sheet"
+        pattern: "*TITLE*.pdf"
+      - key: "index_sheet"
+        pattern: "*INDEX*.pdf"
+      - key: "typical_sections"
+        pattern: "*TYP*.pdf"
+      - key: "quantities"
+        pattern: "*QUANT*|*TABUL*|*PAY*ITEM*.pdf"
+      - key: "mot_tmp"
+        pattern: "*MOT*|*TMP*.pdf"
+      - key: "drainage"
+        pattern: "*DRAIN*|*STRUCT*.pdf"
+    optional:
+      - key: "usps"
+        pattern: "*USP*.pdf|*.docx"
+  Final:
+    required:
+      - key: "final_plans"
+        pattern: "*FINAL*PLANS*.pdf"
+      - key: "engineers_report"
+        pattern: "*ENGINEER*REPORT*.pdf"
+      - key: "usps"
+        pattern: "*USP*.pdf"
+      - key: "cpd"
+        pattern: "*CPD*.pdf|*.docx"
+checks:
+  pdf_text_scan:
+    enabled: true
+    keywords_required:
+      - "PREPARED FOR INDIANA DEPARTMENT OF TRANSPORTATION"
+    keywords_forbidden:
+      - "PRELIMINARY"
+      - "NOT FOR CONSTRUCTION"
+    pages: 3
+  dates:
+    require_revision_date: true
+    date_regex: "\\b(0?[1-9]|1[0-2])[/-](0?[1-9]|[12]\\d|3[01])[/-](20\\d\\d)\\b"
+  sheet_limits:
+    min_total_sheets: 5
+    max_total_sheets: 3000
+packaging:
+  include_checksums: true
+  checksum_algo: "sha256"
+  zip_name_format: "{des}_{stage}_submittal.zip"
+templates:
+  transmittal_docx: "templates/transmittal.docx.j2"
+  report_html: "templates/report.html.j2"

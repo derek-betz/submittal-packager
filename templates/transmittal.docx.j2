@@ -1,0 +1,29 @@
+{{ project.designation }} – {{ project.project_name }}
+Stage: {{ stage }}
+Consultant: {{ project.consultant }}
+Contact: {{ project.contact }}
+
+Summary
+=======
+Total files: {{ totals.files }}
+Total pages: {{ totals.pages }}
+
+{% if exceptions.errors %}
+Errors:
+{% for err in exceptions.errors %}- {{ err }}
+{% endfor %}
+{% endif %}
+{% if exceptions.warnings %}
+Warnings:
+{% for warn in exceptions.warnings %}- {{ warn }}
+{% endfor %}
+{% endif %}
+
+Files
+=====
+{% for item in files %}- {{ item.relative_path }} ({{ item.pages }} pages, checksum: {{ item.checksum }})
+{% endfor %}
+
+Signature:
+Engineer: _________________________
+Date: _____________________________
