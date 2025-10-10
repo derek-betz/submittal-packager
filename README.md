@@ -25,6 +25,8 @@ The following packages are automatically installed when you set up the project:
 ### Optional Dependencies
 - `pytest` - For running tests
 - `pytest-cov` - For test coverage reports
+- `PySide6` - Enables the graphical desktop application
+- `pyinstaller` - Bundles the GUI into a standalone executable
 
 ### System Dependencies
 - **Windows users**: May need Microsoft C++ Build Tools if `python-docx` fails to build
@@ -38,6 +40,36 @@ pip install -e .[test]
 submittal-packager init-config config.yml --idm-stage Stage2
 submittal-packager validate examples/sample --stage Stage2 --config config.yml
 ```
+
+Install the graphical user interface and launch it with:
+
+```bash
+pip install -e .[gui]
+submittal-packager-gui
+```
+
+## Graphical User Interface
+
+The desktop client provides a guided workflow for INDOT reviewers and consultants:
+
+- **Project setup** – capture the project root, configuration file, stage preset, and optional ignore/map files. IDM defaults are surfaced inline so teams understand the expected deliverables for each stage.
+- **Validation results** – errors and warnings are grouped by severity with manifest metadata so issues can be triaged without digging through console output.
+- **Packaging log** – real-time progress updates and log forwarding mirror the CLI experience while keeping the interface responsive.
+
+All actions run on background threads and reuse the existing `run_validate`, `run_package`, and `run_report` routines so the CLI and GUI stay in lockstep.
+
+Logs are written to `~/.submittal_packager/gui.log` and are also streamed into the packaging view for quick troubleshooting.
+
+### Building a Windows-ready executable
+
+The repository ships with a helper script that wraps PyInstaller:
+
+```bash
+pip install -e .[gui]
+python scripts/build_gui.py --clean --dist dist/gui
+```
+
+The resulting `dist/gui/submittal-packager-gui` folder contains the executable and bundled resources that can be copied directly to INDOT workstations without requiring a Python install.
 
 ## Example Configuration
 
