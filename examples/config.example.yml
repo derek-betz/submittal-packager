@@ -65,7 +65,14 @@ checks:
 packaging:
   include_checksums: true
   checksum_algo: "sha256"
-  zip_name_format: "{des}_{stage}_submittal.zip"
+  zip_name_format: "{des}_{stage}_IDM.zip"
+  root_folder_format: "{des}_{stage}_IDM"
+  default_folder: "2_Plan_Set"
+  # Uncomment to add custom IDM folders in addition to the built-in defaults
+  # folders:
+  #   - name: "5_Permits"
+  #     description: "Environmental permits and approvals"
+  #     patterns: ["*PERMIT*"]
 templates:
   transmittal_docx: "templates/transmittal.docx.j2"
   report_html: "templates/report.html.j2"

@@ -51,6 +51,30 @@ See [`examples/config.example.yml`](examples/config.example.yml) for a complete 
 * `report PATH --stage Stage2 --config config.yml`: Rebuild the HTML report from the last validation run.
 * `init-config PATH [--idm-stage Stage3]`: Write a starter `config.yml` to the given path using optional Indiana Design Manual presets.
 
+## Packaging Outputs
+
+Running `submittal-packager package` now creates a ZIP that mirrors the IDM checklist structure:
+
+```
+DESIGNATION_STAGE_IDM/
+├── 0_Admin/            # Generated manifest, checksum register, transmittal, validation report, log
+├── 1_Cover_Letter/     # Signed cover letter or correspondence supplied in the project folder
+├── 2_Plan_Set/         # Plan PDFs grouped by discipline/stage metadata
+├── 3_Supporting_Docs/  # Design memoranda, calculations, and other supplemental files
+└── 4_PCFS/             # Project Certification Forms and approvals
+```
+
+The manifest CSV includes additional IDM-aligned metadata:
+
+* `package_path` – final location inside the ZIP
+* `checksum_algorithm` – algorithm used to calculate `checksum`
+* `source_modified_utc` – timestamp of the original file
+* Summary sections for folder, discipline, and file-extension totals
+
+Checksums are stored as a CSV (`algorithm,checksum,relative_path,package_path`) to aid reviewers that prefer spreadsheet filters.
+
+The generated DOCX transmittal and HTML validation report highlight consultant contact information, the certification statement, a packaging layout table, and any validation exceptions so teams can quickly confirm IDM compliance.
+
 ## IDM Stage Presets
 
 The Indiana Design Manual datasets live in `src/submittal_packager/idm_requirements.py`. Each entry describes the required and optional artifacts, discipline codes, INDOT form references, and common keywords for Stage 1, Stage 2, Stage 3, and Final submittals. The configuration loader now supports a `preset` flag under each `stages` entry. When set, the curated defaults are merged with any user-provided overrides so teams can start from the official checklist and add project-specific files.

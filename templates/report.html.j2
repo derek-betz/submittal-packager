@@ -17,14 +17,25 @@
 <body>
   <h1>Submittal Validation Report</h1>
   <p><strong>Project:</strong> {{ project.designation }} – {{ project.project_name }}</p>
+  <p><strong>Route:</strong> {{ project.route }}</p>
   <p><strong>Stage:</strong> {{ stage }}</p>
+  <p><strong>Consultant:</strong> {{ project.consultant }}</p>
+  <p><strong>Primary Contact:</strong> {{ project.contact }}</p>
   <p><strong>Generated:</strong> {{ generated_at }}</p>
 
   <section>
     <h2>Summary</h2>
-    <p class="status-ok">Files: {{ totals.files }}</p>
-    <p class="status-ok">Pages: {{ totals.pages }}</p>
+    <p class="status-ok">Files: {{ package_overview.totals.files if package_overview.totals is defined else totals.files }}</p>
+    <p class="status-ok">Pages: {{ package_overview.totals.pages if package_overview.totals is defined else totals.pages }}</p>
     <p class="status-ok">Checksum Algorithm: {{ checksum_algo }}</p>
+  </section>
+
+  <section>
+    <h2>Certification Statement</h2>
+    <p>
+      The consultant of record certifies that this package aligns with the Indiana Design Manual
+      submittal checklist and contains all materials required for INDOT review.
+    </p>
   </section>
 
   <section>
@@ -48,6 +59,66 @@
   </section>
 
   <section>
+    <h2>Packaging Layout</h2>
+    <p><strong>ZIP Root Folder:</strong> {{ package_overview.root or 'Not Set' }}</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Folder</th>
+          <th>Description</th>
+          <th>Files</th>
+          <th>Pages</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for folder in package_overview.folders %}
+        <tr>
+          <td>{{ folder.name }}</td>
+          <td>{{ folder.description or '' }}</td>
+          <td>{{ folder.summary.files }}</td>
+          <td>{{ folder.summary.pages }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Generated Administrative Artifacts</h2>
+    {% if package_overview.generated %}
+    <ul>
+    {% for artifact in package_overview.generated %}
+      <li>{{ artifact.label }} – {{ artifact.package_path }}</li>
+    {% endfor %}
+    </ul>
+    {% else %}
+    <p>No additional administrative artifacts were generated for this package.</p>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>Discipline Summary</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Discipline</th>
+          <th>Files</th>
+          <th>Pages</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for discipline, stats in package_overview.discipline_summary.items() %}
+        <tr>
+          <td>{{ discipline }}</td>
+          <td>{{ stats.files }}</td>
+          <td>{{ stats.pages }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section>
     <h2>Files</h2>
     <table>
       <thead>
@@ -58,6 +129,7 @@
           <th>Sheet Type</th>
           <th>Sheets</th>
           <th>Checksum</th>
+          <th>Package Path</th>
         </tr>
       </thead>
       <tbody>
@@ -68,7 +140,8 @@
           <td>{{ item.discipline or '' }}</td>
           <td>{{ item.sheet_type or '' }}</td>
           <td>{{ item.sheet_start }}{% if item.sheet_end %}-{{ item.sheet_end }}{% endif %}</td>
-          <td>{{ item.checksum }}</td>
+          <td>{{ item.checksum }} ({{ item.checksum_algorithm }})</td>
+          <td>{{ item.package_path or '' }}</td>
         </tr>
       {% endfor %}
       </tbody>
