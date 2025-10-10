@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import yaml
-from pydantic import BaseModel, Field, ValidationError, validator, root_validator
+from pydantic import BaseModel, Field, ValidationError, root_validator, validator
 
 from .idm_requirements import get_stage_defaults
 
@@ -68,6 +68,7 @@ class StageArtifacts(BaseModel):
     forms: List[str] = Field(default_factory=list)
     keywords_required: List[str] = Field(default_factory=list)
     keywords_optional: List[str] = Field(default_factory=list)
+    keywords_forbidden: List[str] = Field(default_factory=list)
 
     @root_validator(pre=True)
     def _merge_preset_defaults(cls, values: Dict[str, Any]) -> Dict[str, Any]:
@@ -131,7 +132,13 @@ class StageArtifacts(BaseModel):
             provided_list = _coerce_requirements(values.get(key))
             merged[key] = _merge_requirements(defaults_list, provided_list)
 
-        for key in ("discipline_codes", "forms", "keywords_required", "keywords_optional"):
+        for key in (
+            "discipline_codes",
+            "forms",
+            "keywords_required",
+            "keywords_optional",
+            "keywords_forbidden",
+        ):
             merged[key] = _merge_unique(defaults.get(key, []), values.get(key))
 
         return merged
@@ -142,11 +149,27 @@ class PdfTextScanConfig(BaseModel):
     keywords_required: List[str] = Field(default_factory=list)
     keywords_forbidden: List[str] = Field(default_factory=list)
     pages: int = 3
+    require_all_keywords: bool = True
 
 
 class DateCheckConfig(BaseModel):
     require_revision_date: bool = False
     date_regex: Optional[str] = None
+
+
+class DisciplineValidationConfig(BaseModel):
+    enabled: bool = True
+
+
+class FormsValidationConfig(BaseModel):
+    enabled: bool = True
+
+
+class SheetNumberingValidationConfig(BaseModel):
+    enabled: bool = True
+    width: int = 4
+    require_contiguous: bool = False
+    starting_number: Optional[int] = None
 
 
 class SheetLimitConfig(BaseModel):
@@ -158,6 +181,9 @@ class ChecksConfig(BaseModel):
     pdf_text_scan: PdfTextScanConfig = Field(default_factory=PdfTextScanConfig)
     dates: DateCheckConfig = Field(default_factory=DateCheckConfig)
     sheet_limits: SheetLimitConfig = Field(default_factory=SheetLimitConfig)
+    discipline_codes: DisciplineValidationConfig = Field(default_factory=DisciplineValidationConfig)
+    forms: FormsValidationConfig = Field(default_factory=FormsValidationConfig)
+    sheet_numbering: SheetNumberingValidationConfig = Field(default_factory=SheetNumberingValidationConfig)
 
 
 class PackagingConfig(BaseModel):

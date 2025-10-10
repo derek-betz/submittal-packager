@@ -10,7 +10,7 @@ from typing import Dict, Iterable, List, Sequence, Tuple
 from pathspec import PathSpec
 from pathspec.patterns import GitWildMatchPattern
 
-from .config import Config, RequirementConfig
+from .config import Config, RequirementConfig, StageArtifacts
 from .models import MessageLevel, ParsedFilename, ValidationMessage
 
 
@@ -39,6 +39,22 @@ def normalize_stage(stage: str, *, case_insensitive: bool) -> str:
     return stage.lower() if case_insensitive else stage
 
 
+def resolve_stage_config(
+    stage_name: str | None, config: Config
+) -> Tuple[str | None, StageArtifacts | None]:
+    """Return the configured stage entry for a parsed stage name."""
+
+    if not stage_name:
+        return None, None
+
+    for key, stage_config in config.stages.items():
+        if key == stage_name:
+            return key, stage_config
+        if config.conventions.stage_case_insensitive and key.lower() == stage_name.lower():
+            return key, stage_config
+    return None, None
+
+
 def normalize_sheet_range(raw: str) -> Tuple[int, int | None]:
     """Convert a sheet range string to integers."""
 
@@ -46,6 +62,12 @@ def normalize_sheet_range(raw: str) -> Tuple[int, int | None]:
         start_str, end_str = raw.split("-", 1)
         return int(start_str), int(end_str)
     return int(raw), None
+
+
+def _normalize_token(value: str) -> str:
+    """Normalize a string for fuzzy comparisons."""
+
+    return re.sub(r"[^a-z0-9]", "", value.lower())
 
 
 def parse_filename(path: Path, config: Config) -> Tuple[ParsedFilename | None, List[ValidationMessage]]:
@@ -81,14 +103,71 @@ def parse_filename(path: Path, config: Config) -> Tuple[ParsedFilename | None, L
     if parsed.ext and parsed.ext.lower() not in config.conventions.allowed_extensions:
         messages.append(ValidationMessage(MessageLevel.ERROR, f"Extension '{parsed.ext}' is not allowed"))
 
+    raw_stage = data.get("stage")
+    if raw_stage:
+        parsed.stage = normalize_stage(raw_stage, case_insensitive=config.conventions.stage_case_insensitive)
+    stage_key, stage_config = resolve_stage_config(raw_stage, config)
+    parsed.stage_key = stage_key
+
+    if raw_stage and stage_key is None:
+        messages.append(
+            ValidationMessage(
+                MessageLevel.ERROR,
+                f"Stage '{raw_stage}' referenced by {name} is not configured in project settings",
+            )
+        )
+
+    if parsed.discipline:
+        parsed.discipline = parsed.discipline.upper()
+        if (
+            stage_config
+            and config.checks.discipline_codes.enabled
+            and stage_config.discipline_codes
+            and parsed.discipline not in {code.upper() for code in stage_config.discipline_codes}
+        ):
+            stage_label = getattr(stage_config, "name", stage_key or raw_stage or "configured stage")
+            messages.append(
+                ValidationMessage(
+                    MessageLevel.ERROR,
+                    f"Discipline '{parsed.discipline}' is not valid for {stage_label}",
+                )
+            )
+
     sheet_range = data.get("sheet_range")
     if sheet_range:
-        start, end = normalize_sheet_range(sheet_range)
-        parsed.sheet_start = start
-        parsed.sheet_end = end
-
-    if parsed.stage and config.conventions.stage_case_insensitive:
-        parsed.stage = parsed.stage.lower()
+        parsed.sheet_range_raw = sheet_range
+        number_config = config.checks.sheet_numbering
+        components = sheet_range.split("-")
+        has_error = False
+        for component in components:
+            if not component.isdigit():
+                messages.append(
+                    ValidationMessage(
+                        MessageLevel.ERROR,
+                        f"Sheet number '{component}' in {name} is not numeric",
+                    )
+                )
+                has_error = True
+                continue
+            if number_config.enabled and number_config.width and len(component) != number_config.width:
+                messages.append(
+                    ValidationMessage(
+                        MessageLevel.ERROR,
+                        f"Sheet number '{component}' in {name} must be {number_config.width} digits",
+                    )
+                )
+                has_error = True
+        if not has_error:
+            start, end = normalize_sheet_range(sheet_range)
+            parsed.sheet_start = start
+            parsed.sheet_end = end
+            if end is not None and start > end:
+                messages.append(
+                    ValidationMessage(
+                        MessageLevel.ERROR,
+                        f"Sheet range {sheet_range} in {name} is invalid (start greater than end)",
+                    )
+                )
 
     if parsed.ext:
         parsed.ext = parsed.ext.lower()
@@ -145,6 +224,113 @@ def detect_duplicate_ranges(parsed_files: Sequence[ParsedFilename]) -> List[Vali
     return messages
 
 
+def validate_discipline_codes(
+    parsed_files: Sequence[ParsedFilename],
+    stage_key: str,
+    stage_config: StageArtifacts | None,
+    config: Config,
+) -> List[ValidationMessage]:
+    """Ensure parsed files use the expected stage and discipline codes."""
+
+    messages: List[ValidationMessage] = []
+    if not stage_config or not config.checks.discipline_codes.enabled:
+        return messages
+
+    allowed = {code.upper() for code in stage_config.discipline_codes}
+    for parsed in parsed_files:
+        if parsed.stage_key and parsed.stage_key != stage_key:
+            messages.append(
+                ValidationMessage(
+                    MessageLevel.ERROR,
+                    f"File {parsed.source.name} references stage '{parsed.stage}' but validating stage is '{stage_key}'",
+                )
+            )
+        if not allowed or not parsed.discipline:
+            continue
+        if parsed.discipline.upper() not in allowed:
+            messages.append(
+                ValidationMessage(
+                    MessageLevel.ERROR,
+                    f"Discipline '{parsed.discipline}' in {parsed.source.name} is not permitted for stage {stage_key}",
+                )
+            )
+    return messages
+
+
+def validate_indot_forms(
+    files: Sequence[Path], stage_config: StageArtifacts | None, config: Config
+) -> List[ValidationMessage]:
+    """Validate presence of required INDOT forms by fuzzy filename matching."""
+
+    messages: List[ValidationMessage] = []
+    if not stage_config or not config.checks.forms.enabled or not stage_config.forms:
+        return messages
+
+    normalized_files = [_normalize_token(path.name) for path in files]
+    for form in stage_config.forms:
+        token = _normalize_token(form)
+        if not token:
+            continue
+        if not any(token in name for name in normalized_files):
+            messages.append(
+                ValidationMessage(
+                    MessageLevel.ERROR,
+                    f"Expected form '{form}' was not found in submission",
+                )
+            )
+    return messages
+
+
+def validate_sheet_numbering(
+    parsed_files: Sequence[ParsedFilename], config: Config
+) -> List[ValidationMessage]:
+    """Validate sheet numbering continuity and detect overlaps."""
+
+    number_config = config.checks.sheet_numbering
+    messages: List[ValidationMessage] = []
+    if not number_config.enabled:
+        return messages
+
+    messages.extend(detect_duplicate_ranges(parsed_files))
+
+    if not number_config.require_contiguous and number_config.starting_number is None:
+        return messages
+
+    by_discipline: Dict[str, List[ParsedFilename]] = {}
+    for parsed in parsed_files:
+        if parsed.sheet_start is None:
+            continue
+        key = parsed.discipline or "UNKNOWN"
+        by_discipline.setdefault(key, []).append(parsed)
+
+    for discipline, records in by_discipline.items():
+        records.sort(key=lambda entry: entry.sheet_start or 0)
+        if number_config.starting_number is not None and records:
+            first = records[0].sheet_start
+            if first is not None and first != number_config.starting_number:
+                messages.append(
+                    ValidationMessage(
+                        MessageLevel.WARNING,
+                        f"Discipline {discipline} begins at sheet {first:0{number_config.width}d} but expected {number_config.starting_number:0{number_config.width}d}",
+                    )
+                )
+        if not number_config.require_contiguous:
+            continue
+        expected = records[0].sheet_start or 0
+        for record in records:
+            if record.sheet_start != expected:
+                messages.append(
+                    ValidationMessage(
+                        MessageLevel.ERROR,
+                        f"Discipline {discipline} numbering jumps to {record.sheet_start:0{number_config.width}d} in {record.source.name}; expected {expected:0{number_config.width}d}",
+                    )
+                )
+                expected = record.sheet_start or expected
+            end_value = record.sheet_end or record.sheet_start or expected
+            expected = end_value + 1
+    return messages
+
+
 __all__ = [
     "compile_ignore_patterns",
     "is_ignored",
@@ -153,4 +339,8 @@ __all__ = [
     "validate_required",
     "detect_duplicate_ranges",
     "normalize_sheet_range",
+    "resolve_stage_config",
+    "validate_discipline_codes",
+    "validate_indot_forms",
+    "validate_sheet_numbering",
 ]

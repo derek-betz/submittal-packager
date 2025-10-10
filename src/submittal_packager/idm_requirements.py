@@ -79,8 +79,14 @@ _IDM_STAGE_DEFAULTS: Dict[str, StageDefaults] = {
             "Form IC-701 Preliminary Field Check Transmittal",
             "Form IC-730 Stage 1 Quantities Checklist",
         ],
-        "keywords_required": ["STAGE 1", "PRELIMINARY", "FIELD CHECK"],
+        "keywords_required": [
+            "STAGE 1",
+            "PRELIMINARY",
+            "FIELD CHECK",
+            "INDIANA DEPARTMENT OF TRANSPORTATION",
+        ],
         "keywords_optional": ["PFC", "CONCEPT"],
+        "keywords_forbidden": ["NOT FOR CONSTRUCTION"],
     },
     "Stage2": {
         "name": "Stage 2 - Design Development",
@@ -143,8 +149,13 @@ _IDM_STAGE_DEFAULTS: Dict[str, StageDefaults] = {
             "Form IC-702 Stage 2 Transmittal",
             "Form IC-733 Stage 2 Design Development Checklist",
         ],
-        "keywords_required": ["STAGE 2", "DESIGN DEVELOPMENT"],
+        "keywords_required": [
+            "STAGE 2",
+            "DESIGN DEVELOPMENT",
+            "INDIANA DEPARTMENT OF TRANSPORTATION",
+        ],
         "keywords_optional": ["60%", "DESIGN REVIEW"],
+        "keywords_forbidden": ["NOT FOR CONSTRUCTION"],
     },
     "Stage3": {
         "name": "Stage 3 - Final Check Plans",
@@ -212,8 +223,13 @@ _IDM_STAGE_DEFAULTS: Dict[str, StageDefaults] = {
             "Form IC-703 Stage 3 Transmittal",
             "Form IC-735 Final Check QA Checklist",
         ],
-        "keywords_required": ["STAGE 3", "FINAL CHECK"],
+        "keywords_required": [
+            "STAGE 3",
+            "FINAL CHECK",
+            "INDIANA DEPARTMENT OF TRANSPORTATION",
+        ],
         "keywords_optional": ["90%", "QC REVIEW"],
+        "keywords_forbidden": ["NOT FOR CONSTRUCTION"],
     },
     "Final": {
         "name": "Final Tracings / RFC",
@@ -272,8 +288,14 @@ _IDM_STAGE_DEFAULTS: Dict[str, StageDefaults] = {
             "Form IC-736 RFC Certification",
             "Form IC-762 Design Approval Checklist",
         ],
-        "keywords_required": ["FINAL", "RFC", "RELEASE FOR CONSTRUCTION"],
+        "keywords_required": [
+            "FINAL",
+            "RFC",
+            "RELEASE FOR CONSTRUCTION",
+            "INDIANA DEPARTMENT OF TRANSPORTATION",
+        ],
         "keywords_optional": ["SEALED", "ISSUED FOR CONSTRUCTION"],
+        "keywords_forbidden": ["NOT FOR CONSTRUCTION"],
     },
 }
 
