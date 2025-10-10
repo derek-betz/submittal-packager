@@ -35,7 +35,7 @@ The following packages are automatically installed when you set up the project:
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .[test]
-submittal-packager init-config config.yml
+submittal-packager init-config config.yml --idm-stage Stage2
 submittal-packager validate examples/sample --stage Stage2 --config config.yml
 ```
 
@@ -46,9 +46,23 @@ See [`examples/config.example.yml`](examples/config.example.yml) for a complete 
 ## Commands
 
 * `validate PATH --stage Stage2 --config config.yml`: Validate the project folder.
+
 * `package PATH --stage Stage2 --config config.yml`: Validate and create manifest, checksums, transmittal, and ZIP package.
 * `report PATH --stage Stage2 --config config.yml`: Rebuild the HTML report from the last validation run.
-* `init-config PATH`: Write a starter `config.yml` to the given path.
+* `init-config PATH [--idm-stage Stage3]`: Write a starter `config.yml` to the given path using optional Indiana Design Manual presets.
+
+## IDM Stage Presets
+
+The Indiana Design Manual datasets live in `src/submittal_packager/idm_requirements.py`. Each entry describes the required and optional artifacts, discipline codes, INDOT form references, and common keywords for Stage 1, Stage 2, Stage 3, and Final submittals. The configuration loader now supports a `preset` flag under each `stages` entry. When set, the curated defaults are merged with any user-provided overrides so teams can start from the official checklist and add project-specific files.
+
+Generate a configuration that pulls these defaults directly from the CLI:
+
+```bash
+submittal-packager init-config config.yml --idm-stage Stage3
+```
+
+The resulting YAML includes the merged artifact lists and also seeds the PDF keyword scan check with the expected phrases for the chosen stage. You can switch presets later by editing the `preset` value or disabling inheritance with `inherit_defaults: false` if you need a completely custom stage definition.
+
 
 ## Extending Filename Rules
 

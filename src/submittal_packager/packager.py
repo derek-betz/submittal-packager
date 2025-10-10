@@ -38,10 +38,15 @@ class ValidationFailure(Exception):
         self.result = result
 
 
-def _gather_files(root: Path, ignore_file: Path | None) -> List[Path]:
+def _gather_files(
+    root: Path, ignore_file: Path | None, exclude: set[Path] | None = None
+) -> List[Path]:
     spec = compile_ignore_patterns(root, ignore_file)
     files: List[Path] = []
     for path in sorted(root.rglob("*")):
+        resolved = path.resolve()
+        if exclude and any(resolved == ex or resolved.is_relative_to(ex) for ex in exclude):
+            continue
         if path.is_file() and not is_ignored(path, spec, root):
             files.append(path)
     return files
@@ -123,11 +128,13 @@ def validate_directory(
     strict: bool = False,
     ignore_file: Path | None = None,
     map_file: Path | None = None,
+    exclude_paths: Iterable[Path] | None = None,
 ) -> ValidationResult:
     """Validate directory contents and return result."""
 
     logger.debug("Starting validation for stage {}", stage)
-    files = _gather_files(root, ignore_file)
+    exclude = {path.resolve() for path in exclude_paths} if exclude_paths else None
+    files = _gather_files(root, ignore_file, exclude)
     manifest_entries, messages = _build_manifest(root, files, config, stage)
 
     result = ValidationResult(manifest=manifest_entries)
@@ -240,7 +247,15 @@ def run_package(
     if no_scan:
         config.checks.pdf_text_scan.enabled = False
 
-    result = validate_directory(root, config, stage, strict=strict, ignore_file=ignore_file, map_file=map_file)
+    result = validate_directory(
+        root,
+        config,
+        stage,
+        strict=strict,
+        ignore_file=ignore_file,
+        map_file=map_file,
+        exclude_paths=[config_path, out_dir],
+    )
     if result.has_errors:
         raise ValidationFailure(result)
 
@@ -302,7 +317,15 @@ def run_validate(
     map_file: Path | None = None,
 ) -> ValidationResult:
     config = load_config(config_path)
-    return validate_directory(root, config, stage, strict=strict, ignore_file=ignore_file, map_file=map_file)
+    return validate_directory(
+        root,
+        config,
+        stage,
+        strict=strict,
+        ignore_file=ignore_file,
+        map_file=map_file,
+        exclude_paths=[config_path],
+    )
 
 
 def run_report(
