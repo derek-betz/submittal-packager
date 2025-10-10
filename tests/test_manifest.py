@@ -84,3 +84,40 @@ def test_pdf_keyword_scan(project_root: Path, config: Config) -> None:
     create_text_pdf(forbidden, "FORBIDDEN")
     result2 = validate_directory(project_root, config, "Stage2")
     assert any("Forbidden" in msg.text for msg in result2.errors)
+
+
+def test_validate_directory_missing_forms(project_root: Path, config: Config) -> None:
+    config.stages["Stage2"].forms = ["Form IC-701"]
+    title = project_root / "2401490_Stage2_TITLE_TITLE_0001.pdf"
+    plans = project_root / "2401490_Stage2_ROAD_PLANS_0002.pdf"
+    create_text_pdf(title, "TITLE")
+    create_text_pdf(plans, "PLANS")
+
+    result = validate_directory(project_root, config, "Stage2")
+    assert any("Form IC-701" in msg.text for msg in result.errors)
+
+    config.checks.forms.enabled = False
+    result_disabled = validate_directory(project_root, config, "Stage2")
+    assert not any("Form IC-701" in msg.text for msg in result_disabled.errors)
+
+
+def test_validate_directory_sheet_numbering(project_root: Path, config: Config) -> None:
+    config.checks.sheet_numbering.require_contiguous = True
+    config.checks.sheet_numbering.width = 4
+    sheet_one = project_root / "2401490_Stage2_ROAD_PLANS_0001.pdf"
+    sheet_three = project_root / "2401490_Stage2_ROAD_PLANS_0003.pdf"
+    create_text_pdf(sheet_one, "S1")
+    create_text_pdf(sheet_three, "S3")
+
+    result = validate_directory(project_root, config, "Stage2")
+    assert any("numbering jumps" in msg.text for msg in result.errors)
+
+
+def test_validate_directory_forbidden_keywords_from_stage(project_root: Path, config: Config) -> None:
+    config.checks.pdf_text_scan.enabled = True
+    config.stages["Stage2"].keywords_forbidden = ["NOT FOR CONSTRUCTION"]
+    title = project_root / "2401490_Stage2_TITLE_TITLE_0001.pdf"
+    create_text_pdf(title, "NOT FOR CONSTRUCTION")
+
+    result = validate_directory(project_root, config, "Stage2")
+    assert any("Forbidden keywords" in msg.text for msg in result.errors)

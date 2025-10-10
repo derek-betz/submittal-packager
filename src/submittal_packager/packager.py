@@ -15,16 +15,19 @@ from loguru import logger
 from rich.console import Console
 from rich.table import Table
 
-from .config import Config, ConfigError, load_config
+from .config import Config, ConfigError, StageArtifacts, load_config
 from .models import ManifestEntry, MessageLevel, ParsedFilename, ValidationMessage, ValidationResult
-from .pdf_utils import contains_forbidden, contains_keywords, pdf_extract_text, pdf_page_count
+from .pdf_utils import pdf_extract_text, pdf_page_count
 from .reporting import generate_html_report, generate_transmittal_docx
 from .validators import (
     compile_ignore_patterns,
-    detect_duplicate_ranges,
     is_ignored,
     parse_filename,
+    resolve_stage_config,
+    validate_discipline_codes,
+    validate_indot_forms,
     validate_required,
+    validate_sheet_numbering,
 )
 
 console = Console()
@@ -61,11 +64,26 @@ def _checksum(path: Path, algorithm: str) -> str:
 
 
 def _build_manifest(
-    root: Path, files: Iterable[Path], config: Config, stage: str
-) -> Tuple[List[ManifestEntry], List[ValidationMessage]]:
+    root: Path,
+    files: Iterable[Path],
+    config: Config,
+    stage_config: StageArtifacts | None,
+) -> Tuple[List[ManifestEntry], List[ValidationMessage], List[ParsedFilename]]:
     entries: List[ManifestEntry] = []
     messages: List[ValidationMessage] = []
     parsed_records: List[ParsedFilename] = []
+
+    scan_config = config.checks.pdf_text_scan
+    required_keywords_global: set[str] = set()
+    forbidden_keywords_global: set[str] = set()
+    if scan_config.enabled:
+        required_keywords_global.update(scan_config.keywords_required)
+        forbidden_keywords_global.update(scan_config.keywords_forbidden)
+        if stage_config:
+            required_keywords_global.update(stage_config.keywords_required)
+            forbidden_keywords_global.update(stage_config.keywords_forbidden)
+
+    missing_keywords = {keyword for keyword in required_keywords_global}
 
     for file in files:
         parsed, parse_messages = parse_filename(file, config)
@@ -97,21 +115,33 @@ def _build_manifest(
         )
         entries.append(entry)
 
-        if config.checks.pdf_text_scan.enabled and parsed.ext == "pdf":
-            text = pdf_extract_text(file, max_pages=config.checks.pdf_text_scan.pages)
-            if config.checks.pdf_text_scan.keywords_forbidden and contains_forbidden(
-                text, config.checks.pdf_text_scan.keywords_forbidden
-            ):
-                messages.append(
-                    ValidationMessage(
-                        MessageLevel.ERROR,
-                        f"Forbidden keywords present in {file.name}",
-                    )
-                )
-    # Note: we do not warn when required keywords are missing to keep validation noise minimal.
+        if scan_config.enabled and parsed.ext == "pdf":
+            text = pdf_extract_text(file, max_pages=scan_config.pages)
+            text_lower = text.lower()
+            for keyword in list(missing_keywords):
+                if keyword.lower() in text_lower:
+                    missing_keywords.discard(keyword)
 
-    messages.extend(detect_duplicate_ranges(parsed_records))
-    return entries, messages
+            if forbidden_keywords_global:
+                hits = [kw for kw in sorted(forbidden_keywords_global) if kw.lower() in text_lower]
+                if hits:
+                    messages.append(
+                        ValidationMessage(
+                            MessageLevel.ERROR,
+                            f"Forbidden keywords present in {file.name}: {', '.join(hits)}",
+                        )
+                    )
+
+    if scan_config.enabled and missing_keywords:
+        level = MessageLevel.ERROR if scan_config.require_all_keywords else MessageLevel.WARNING
+        messages.append(
+            ValidationMessage(
+                level,
+                f"Missing required keywords across submission: {', '.join(sorted(missing_keywords))}",
+            )
+        )
+
+    return entries, messages, parsed_records
 
 
 def _summarize(entries: List[ManifestEntry]) -> Tuple[int, int]:
@@ -135,18 +165,22 @@ def validate_directory(
     logger.debug("Starting validation for stage {}", stage)
     exclude = {path.resolve() for path in exclude_paths} if exclude_paths else None
     files = _gather_files(root, ignore_file, exclude)
-    manifest_entries, messages = _build_manifest(root, files, config, stage)
+    stage_key, stage_config = resolve_stage_config(stage, config)
+    manifest_entries, messages, parsed_records = _build_manifest(root, files, config, stage_config)
 
     result = ValidationResult(manifest=manifest_entries)
     result.extend(messages)
 
-    stage_config = config.stages.get(stage)
-    if stage_config is None:
+    if stage_key is None or stage_config is None:
         result.errors.append(ValidationMessage(MessageLevel.ERROR, f"Stage '{stage}' not defined in config"))
         return result
 
     required_messages = validate_required(files, stage_config.required)
     result.extend(required_messages)
+
+    result.extend(validate_discipline_codes(parsed_records, stage_key, stage_config, config))
+    result.extend(validate_indot_forms(files, stage_config, config))
+    result.extend(validate_sheet_numbering(parsed_records, config))
 
     files_count, total_pages = _summarize(manifest_entries)
     limits = config.checks.sheet_limits

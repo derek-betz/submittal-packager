@@ -31,11 +31,13 @@ class ParsedFilename:
     source: Path
     des: Optional[str] = None
     stage: Optional[str] = None
+    stage_key: Optional[str] = None
     discipline: Optional[str] = None
     sheet_type: Optional[str] = None
     sheet_start: Optional[int] = None
     sheet_end: Optional[int] = None
     ext: Optional[str] = None
+    sheet_range_raw: Optional[str] = None
 
     @property
     def sheet_count(self) -> Optional[int]:
