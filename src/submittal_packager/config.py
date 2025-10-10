@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import yaml
-from pydantic import BaseModel, Field, ValidationError, validator
+from pydantic import BaseModel, Field, ValidationError, validator, root_validator
+
+from .idm_requirements import get_stage_defaults
 
 
 class ProjectConfig(BaseModel):
@@ -47,13 +49,92 @@ class RequirementConfig(BaseModel):
 
     key: str
     pattern: str
+    description: Optional[str] = None
 
 
 class StageArtifacts(BaseModel):
     """Artifacts required for a particular stage."""
 
+    preset: Optional[str] = Field(
+        default=None, description="IDM stage preset to use for initial defaults."
+    )
+    inherit_defaults: bool = Field(
+        default=True,
+        description="Merge preset defaults into the stage configuration when true.",
+    )
     required: List[RequirementConfig] = Field(default_factory=list)
     optional: List[RequirementConfig] = Field(default_factory=list)
+    discipline_codes: List[str] = Field(default_factory=list)
+    forms: List[str] = Field(default_factory=list)
+    keywords_required: List[str] = Field(default_factory=list)
+    keywords_optional: List[str] = Field(default_factory=list)
+
+    @root_validator(pre=True)
+    def _merge_preset_defaults(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+        preset = values.get("preset")
+        inherit = values.get("inherit_defaults", True)
+        if not preset or not inherit:
+            return values
+
+        defaults = get_stage_defaults(preset)
+        if defaults is None:
+            raise ValueError(f"Unknown IDM stage preset '{preset}'")
+
+        merged: Dict[str, Any] = dict(values)
+
+        def _coerce_requirements(source: Any) -> List[Dict[str, Any]]:
+            if not source:
+                return []
+            items: List[Dict[str, Any]] = []
+            for entry in source:
+                if isinstance(entry, RequirementConfig):
+                    items.append(entry.dict())
+                elif isinstance(entry, dict):
+                    items.append(dict(entry))
+                else:
+                    raise TypeError(
+                        "Stage artifact requirements must be dictionaries or RequirementConfig instances"
+                    )
+            return items
+
+        def _merge_requirements(
+            default_items: List[Dict[str, Any]],
+            provided_items: List[Dict[str, Any]],
+        ) -> List[Dict[str, Any]]:
+            combined: Dict[str, Dict[str, Any]] = {}
+            for item in default_items + provided_items:
+                key = item.get("key")
+                if not key:
+                    raise ValueError("Each requirement must define a key")
+                combined[key] = item
+            return list(combined.values())
+
+        def _merge_unique(default_items: List[str], provided: Any) -> List[str]:
+            provided_list: List[str]
+            if not provided:
+                provided_list = []
+            elif isinstance(provided, list):
+                provided_list = [str(item) for item in provided]
+            else:
+                provided_list = [str(provided)]
+
+            seen: set[str] = set()
+            ordered: List[str] = []
+            for item in list(default_items) + provided_list:
+                if item not in seen:
+                    seen.add(item)
+                    ordered.append(item)
+            return ordered
+
+        for key in ("required", "optional"):
+            defaults_list = [dict(item) for item in defaults.get(key, [])]
+            provided_list = _coerce_requirements(values.get(key))
+            merged[key] = _merge_requirements(defaults_list, provided_list)
+
+        for key in ("discipline_codes", "forms", "keywords_required", "keywords_optional"):
+            merged[key] = _merge_unique(defaults.get(key, []), values.get(key))
+
+        return merged
 
 
 class PdfTextScanConfig(BaseModel):

@@ -9,7 +9,20 @@ import typer
 from loguru import logger
 from rich.console import Console
 
-from .config import ConfigError, save_config, Config, ProjectConfig, ConventionsConfig, StageArtifacts, RequirementConfig, ChecksConfig, PackagingConfig, TemplatesConfig
+from .idm_requirements import available_stage_presets
+from .config import (
+    ConfigError,
+    save_config,
+    Config,
+    ProjectConfig,
+    ConventionsConfig,
+    StageArtifacts,
+    RequirementConfig,
+    ChecksConfig,
+    PdfTextScanConfig,
+    PackagingConfig,
+    TemplatesConfig,
+)
 from .packager import ValidationFailure, run_package, run_report, run_validate
 
 app = typer.Typer(help="Validate and package INDOT roadway plan submittals.")
@@ -125,8 +138,35 @@ def report_command(
 
 
 @app.command("init-config")
-def init_config(path: Path = typer.Argument(..., writable=True, resolve_path=True)) -> None:
+def init_config(
+    path: Path = typer.Argument(..., writable=True, resolve_path=True),
+    idm_stage: Optional[str] = typer.Option(
+        None,
+        "--idm-stage",
+        help="Apply Indiana Design Manual defaults for the selected stage (Stage1, Stage2, Stage3, Final).",
+    ),
+) -> None:
     """Write an example configuration file to PATH."""
+
+    stage_presets = available_stage_presets()
+
+    def _resolve_stage(stage_value: Optional[str]) -> str:
+        if stage_value is None:
+            return stage_presets[0]
+        token = stage_value.replace(" ", "").replace("_", "").lower()
+        for candidate in stage_presets:
+            if candidate.lower() == token:
+                return candidate
+        raise typer.BadParameter(
+            f"Unknown IDM stage '{stage_value}'. Choose from: {', '.join(stage_presets)}"
+        )
+
+    stage_name = _resolve_stage(idm_stage)
+    stage_artifacts = StageArtifacts(preset=stage_name)
+    pdf_scan_defaults = PdfTextScanConfig(
+        enabled=bool(stage_artifacts.keywords_required),
+        keywords_required=list(stage_artifacts.keywords_required),
+    )
 
     config = Config(
         project=ProjectConfig(
@@ -135,21 +175,14 @@ def init_config(path: Path = typer.Argument(..., writable=True, resolve_path=Tru
             project_name="Example Project",
             consultant="Consultant",
             contact="Jane Doe <jane@example.com>",
-            stage="Stage1",
+            stage=stage_name,
         ),
         conventions=ConventionsConfig(
             filename_pattern="{des}_{stage}_{discipline}_{sheet_type}_{sheet_range}.{ext}",
             regex="^(?P<des>\\d{7})_(?P<stage>Stage[123]|Final)_(?P<discipline>[A-Z]+)_(?P<sheet_type>[A-Za-z0-9]+)_(?P<sheet_range>\\d+(?:-\\d+)?)\\.(?P<ext>pdf|docx)$",
         ),
-        stages={
-            "Stage1": StageArtifacts(
-                required=[
-                    RequirementConfig(key="title_sheet", pattern="*TITLE*.pdf"),
-                    RequirementConfig(key="index_sheet", pattern="*INDEX*.pdf"),
-                ]
-            )
-        },
-        checks=ChecksConfig(),
+        stages={stage_name: stage_artifacts},
+        checks=ChecksConfig(pdf_text_scan=pdf_scan_defaults),
         packaging=PackagingConfig(),
         templates=TemplatesConfig(
             transmittal_docx="templates/transmittal.docx.j2",
@@ -157,7 +190,7 @@ def init_config(path: Path = typer.Argument(..., writable=True, resolve_path=Tru
         ),
     )
     save_config(config, path)
-    console.print(f"[green]Wrote configuration to {path}[/green]")
+    console.print(f"[green]Wrote configuration for {stage_name} to {path}[/green]")
 
 
 if __name__ == "__main__":
