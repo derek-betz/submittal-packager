@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from loguru import logger
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QStyle
 
 from .main_window import MainWindow
@@ -26,9 +27,11 @@ def main() -> int:
     """Entry point used by setuptools and PyInstaller."""
 
     _init_logging()
-    QApplication.setHighDpiScaleFactorRoundingPolicy(
-        getattr(QApplication, "HighDpiScaleFactorRoundingPolicy", 0)
-    )
+    policy = getattr(Qt.HighDpiScaleFactorRoundingPolicy, "PassThrough", None)
+    if policy is None:
+        policy = getattr(Qt.HighDpiScaleFactorRoundingPolicy, "RoundPreferFloor", None)
+    if policy is not None and hasattr(QApplication, "setHighDpiScaleFactorRoundingPolicy"):
+        QApplication.setHighDpiScaleFactorRoundingPolicy(policy)
     app = QApplication(sys.argv)
     app.setOrganizationName("INDOT")
     app.setApplicationName("Submittal Packager")
