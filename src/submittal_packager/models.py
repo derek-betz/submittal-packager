@@ -56,6 +56,7 @@ class ManifestEntry:
     size_bytes: int
     pages: int
     checksum: str
+    checksum_algorithm: str
     des: Optional[str] = None
     stage: Optional[str] = None
     discipline: Optional[str] = None
@@ -63,6 +64,8 @@ class ManifestEntry:
     sheet_start: Optional[int] = None
     sheet_end: Optional[int] = None
     ext: Optional[str] = None
+    package_path: Optional[str] = None
+    source_modified: Optional[str] = None
 
 
 @dataclass(slots=True)

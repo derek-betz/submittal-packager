@@ -186,10 +186,61 @@ class ChecksConfig(BaseModel):
     sheet_numbering: SheetNumberingValidationConfig = Field(default_factory=SheetNumberingValidationConfig)
 
 
+class PackageFolderConfig(BaseModel):
+    """Defines how files are grouped within the packaged ZIP."""
+
+    name: str
+    description: Optional[str] = None
+    patterns: List[str] = Field(default_factory=list)
+    extensions: List[str] = Field(default_factory=list)
+    include_generated: bool = False
+
+    @validator("extensions", each_item=True)
+    def _normalize_extension(cls, value: str) -> str:
+        value = value.lower().lstrip(".")
+        if not value:
+            raise ValueError("File extension filters cannot be empty")
+        return value
+
+
+def _default_packaging_folders() -> List["PackageFolderConfig"]:
+    return [
+        PackageFolderConfig(
+            name="0_Admin",
+            description="Administrative outputs including the manifest, transmittal, and validation report.",
+            patterns=["*manifest*", "*checksum*", "*transmittal*", "*report*"],
+            include_generated=True,
+        ),
+        PackageFolderConfig(
+            name="1_Cover_Letter",
+            description="Signed cover letter and formal correspondence transmitted to INDOT reviewers.",
+            patterns=["*cover*letter*", "*transmittal*.pdf"],
+        ),
+        PackageFolderConfig(
+            name="2_Plan_Set",
+            description="Plan set PDFs organized per the IDM checklist.",
+            extensions=["pdf"],
+        ),
+        PackageFolderConfig(
+            name="3_Supporting_Docs",
+            description="Supporting design documentation such as calculations or memos.",
+            extensions=["doc", "docx", "xls", "xlsx"],
+        ),
+        PackageFolderConfig(
+            name="4_PCFS",
+            description="Project Certification Forms (PCFs) and related approvals.",
+            patterns=["*pcf*"],
+        ),
+    ]
+
+
 class PackagingConfig(BaseModel):
     include_checksums: bool = True
     checksum_algo: str = "sha256"
-    zip_name_format: str = "{des}_{stage}_submittal.zip"
+    zip_name_format: str = "{des}_{stage}_IDM.zip"
+    root_folder_format: str = "{des}_{stage}_IDM"
+    default_folder: str = "2_Plan_Set"
+    folders: List[PackageFolderConfig] = Field(default_factory=_default_packaging_folders)
 
 
 class TemplatesConfig(BaseModel):

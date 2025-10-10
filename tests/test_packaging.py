@@ -79,22 +79,38 @@ def test_run_package_creates_outputs(project: Path, config_path: Path, tmp_path:
     assert transmittal_path.exists()
 
     with manifest_path.open() as handle:
-        rows = list(csv.DictReader(handle))
+        reader = csv.DictReader(handle)
+        rows = [
+            row
+            for row in reader
+            if row.get("relative_path")
+            and row.get("checksum")
+        ]
     assert len(rows) == 2
+    assert all(row["package_path"].startswith("2401490_Stage2_IDM/") for row in rows)
+    assert {row["checksum_algorithm"] for row in rows} == {"sha256"}
+    assert all(row["source_modified_utc"] for row in rows)
 
     with checksums_path.open() as handle:
-        checksum_lines = [line.strip().split()[0] for line in handle if line.strip()]
-    assert len(checksum_lines) == len(rows)
+        checksum_rows = list(csv.DictReader(handle))
+    assert len(checksum_rows) == len(rows)
+    assert {row["checksum"] for row in checksum_rows} == {row["checksum"] for row in rows}
 
     # Re-run packaging to ensure deterministic checksums
     result_repeat = run_package(project, config_path, "Stage2", out_dir=out)
     assert not result_repeat.has_errors
     with checksums_path.open() as handle:
-        checksum_lines_repeat = [line.strip().split()[0] for line in handle if line.strip()]
-    assert checksum_lines == checksum_lines_repeat
+        checksum_rows_repeat = list(csv.DictReader(handle))
+    assert checksum_rows == checksum_rows_repeat
 
-    zip_candidates = list(out.glob("*_submittal.zip"))
+    zip_candidates = list(out.glob("*_IDM.zip"))
     assert zip_candidates
     with zipfile.ZipFile(zip_candidates[0]) as archive:
         names = sorted(archive.namelist())
-    assert names == sorted(row["relative_path"] for row in rows)
+    package_paths = sorted(row["package_path"] for row in rows)
+    for path in package_paths:
+        assert path in names
+    admin_entries = [name for name in names if name.startswith("2401490_Stage2_IDM/0_Admin/")]
+    assert any(name.endswith("manifest.csv") for name in admin_entries)
+    assert any(name.endswith("transmittal.docx") for name in admin_entries)
+    assert any(name.endswith("checksums.sha256") for name in admin_entries)
