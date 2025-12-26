@@ -14,8 +14,9 @@ from urllib.request import Request, urlopen
 DEFAULT_REPO = "derek-betz/BidTabsData"
 DEFAULT_OUT_DIR = "data-sample/BidTabsData"
 API_ACCEPT = "application/vnd.github+json"
-FILE_TYPE_MASK = 0o170000  # matches stat.S_IFMT
-SYMLINK_MODE = 0o120000    # matches stat.S_IFLNK
+# Unix file type bits from stat.h; used to detect symlinks inside archives
+FILE_TYPE_MASK = 0o170000  # stat.S_IFMT
+SYMLINK_MODE = 0o120000    # stat.S_IFLNK
 
 
 def build_headers() -> Dict[str, str]:
@@ -151,7 +152,7 @@ def main() -> None:
             if backup_dir.exists() and not out_dir.exists():
                 try:
                     backup_dir.rename(out_dir)
-                except Exception:
+                except OSError:
                     pass
             raise
         else:
