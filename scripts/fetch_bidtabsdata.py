@@ -54,9 +54,7 @@ def fetch_release(repo: str, version: str, headers: Dict[str, str]) -> Dict:
 def pick_asset(assets: Iterable[Dict]) -> Dict:
     chosen: List[Dict] = [a for a in assets if a.get("name", "").lower().endswith(".zip")]
     if not chosen:
-        chosen = list(assets)
-    if not chosen:
-        raise SystemExit("No release assets found to download")
+        raise SystemExit("No zip release assets found to download")
     return chosen[0]
 
 
@@ -80,7 +78,7 @@ def extract_zip(zip_path: Path, destination: Path) -> None:
 
 
 def locate_payload(extracted_root: Path) -> Path:
-    entries = [p for p in extracted_root.iterdir() if p.name != "__MACOSX"]
+    entries = [p for p in extracted_root.iterdir() if p.name != "__MACOSX" and not p.name.startswith(".")]
     if len(entries) == 1 and entries[0].is_dir():
         return entries[0]
     return extracted_root
