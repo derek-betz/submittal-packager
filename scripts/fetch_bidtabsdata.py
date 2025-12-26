@@ -14,6 +14,8 @@ from urllib.request import Request, urlopen
 DEFAULT_REPO = "derek-betz/BidTabsData"
 DEFAULT_OUT_DIR = "data-sample/BidTabsData"
 API_ACCEPT = "application/vnd.github+json"
+FILE_TYPE_MASK = 0o170000  # matches stat.S_IFMT
+SYMLINK_MODE = 0o120000    # matches stat.S_IFLNK
 
 
 def build_headers() -> Dict[str, str]:
@@ -79,8 +81,8 @@ def extract_zip(zip_path: Path, destination: Path) -> None:
                 target_path = (dest_root / member_path).resolve()
                 if not str(target_path).startswith(str(dest_root)):
                     raise SystemExit(f"Unsafe path in archive: {member.filename}")
-                mode = (member.external_attr >> 16) & 0o170000
-                if mode == 0o120000:
+                mode = (member.external_attr >> 16) & FILE_TYPE_MASK
+                if mode == SYMLINK_MODE:
                     raise SystemExit(f"Symlinks are not allowed in archive: {member.filename}")
                 zip_file.extract(member, destination)
     except zipfile.BadZipFile as exc:
@@ -147,7 +149,10 @@ def main() -> None:
             staging_dir.rename(out_dir)
         except (FileExistsError, PermissionError):
             if backup_dir.exists() and not out_dir.exists():
-                backup_dir.rename(out_dir)
+                try:
+                    backup_dir.rename(out_dir)
+                except Exception:
+                    pass
             raise
         else:
             if backup_dir.exists():
