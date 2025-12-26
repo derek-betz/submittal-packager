@@ -72,6 +72,11 @@ def download_asset(url: str, dest: Path, headers: Dict[str, str]) -> None:
 def extract_zip(zip_path: Path, destination: Path) -> None:
     try:
         with zipfile.ZipFile(zip_path) as zip_file:
+            dest_root = destination.resolve()
+            for member in zip_file.infolist():
+                target_path = (dest_root / member.filename).resolve()
+                if not str(target_path).startswith(str(dest_root)):
+                    raise SystemExit(f"Unsafe path in archive: {member.filename}")
             zip_file.extractall(destination)
     except zipfile.BadZipFile as exc:
         raise SystemExit(f"Asset is not a valid zip archive: {exc}") from exc
@@ -115,10 +120,17 @@ def main() -> None:
         payload_root = locate_payload(extract_root)
         write_version_marker(payload_root, version)
 
+        backup_dir = out_dir_parent / f".{out_dir.name}.old"
+        if backup_dir.exists():
+            shutil.rmtree(backup_dir)
+
         if out_dir.exists():
-            shutil.rmtree(out_dir)
+            out_dir.rename(backup_dir)
 
         payload_root.rename(out_dir)
+
+        if backup_dir.exists():
+            shutil.rmtree(backup_dir)
 
     print(f"Wrote BidTabsData to {out_dir}")
 
