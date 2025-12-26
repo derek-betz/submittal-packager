@@ -4,7 +4,6 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import sys
 import tempfile
 import zipfile
 from pathlib import Path
@@ -114,7 +113,9 @@ def main() -> None:
         if not download_url:
             raise SystemExit("Selected asset is missing a browser_download_url")
 
-        asset_name = Path(asset.get("name") or "BidTabsData.zip").name
+        asset_name = asset.get("name") or "BidTabsData.zip"
+        if "/" in asset_name or "\\" in asset_name:
+            raise SystemExit("Selected asset name contains path separators")
         download_path = Path(tmpdir) / asset_name
         extract_root = Path(tmpdir) / "extract"
         extract_root.mkdir(parents=True, exist_ok=True)
@@ -138,7 +139,7 @@ def main() -> None:
             if out_dir.exists():
                 out_dir.rename(backup_dir)
             staging_dir.rename(out_dir)
-        except OSError:
+        except (FileExistsError, PermissionError, FileNotFoundError):
             if backup_dir.exists() and not out_dir.exists():
                 backup_dir.rename(out_dir)
             raise
