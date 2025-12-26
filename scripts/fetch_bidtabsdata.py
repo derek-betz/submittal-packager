@@ -73,9 +73,15 @@ def extract_zip(zip_path: Path, destination: Path) -> None:
         with zipfile.ZipFile(zip_path) as zip_file:
             dest_root = destination.resolve()
             for member in zip_file.infolist():
-                target_path = (dest_root / member.filename).resolve()
+                member_path = Path(member.filename)
+                if member_path.is_absolute() or ".." in member_path.parts:
+                    raise SystemExit(f"Unsafe path in archive: {member.filename}")
+                target_path = (dest_root / member_path).resolve()
                 if not str(target_path).startswith(str(dest_root)):
                     raise SystemExit(f"Unsafe path in archive: {member.filename}")
+                mode = (member.external_attr >> 16) & 0o170000
+                if mode == 0o120000:
+                    raise SystemExit(f"Symlinks are not allowed in archive: {member.filename}")
                 zip_file.extract(member, destination)
     except zipfile.BadZipFile as exc:
         raise SystemExit(f"Asset is not a valid zip archive: {exc}") from exc
@@ -139,7 +145,7 @@ def main() -> None:
             if out_dir.exists():
                 out_dir.rename(backup_dir)
             staging_dir.rename(out_dir)
-        except (FileExistsError, PermissionError, FileNotFoundError):
+        except (FileExistsError, PermissionError):
             if backup_dir.exists() and not out_dir.exists():
                 backup_dir.rename(out_dir)
             raise
@@ -147,7 +153,7 @@ def main() -> None:
             if backup_dir.exists():
                 shutil.rmtree(backup_dir)
         finally:
-            if staging_dir.exists() and staging_dir != out_dir:
+            if staging_dir.exists():
                 shutil.rmtree(staging_dir)
 
     print(f"Wrote BidTabsData to {out_dir}")
