@@ -110,12 +110,16 @@ def main() -> None:
     out_dir_parent.mkdir(parents=True, exist_ok=True)
 
     with tempfile.TemporaryDirectory(prefix="bidtabsdata_", dir=out_dir_parent) as tmpdir:
+        download_url = asset.get("browser_download_url")
+        if not download_url:
+            raise SystemExit("Selected asset is missing a browser_download_url")
+
         asset_name = Path(asset.get("name") or "BidTabsData.zip").name
         download_path = Path(tmpdir) / asset_name
         extract_root = Path(tmpdir) / "extract"
         extract_root.mkdir(parents=True, exist_ok=True)
 
-        download_asset(asset["browser_download_url"], download_path, headers)
+        download_asset(download_url, download_path, headers)
         extract_zip(download_path, extract_root)
 
         payload_root = locate_payload(extract_root)
@@ -134,7 +138,7 @@ def main() -> None:
             if out_dir.exists():
                 out_dir.rename(backup_dir)
             staging_dir.rename(out_dir)
-        except Exception:
+        except OSError:
             if backup_dir.exists() and not out_dir.exists():
                 backup_dir.rename(out_dir)
             raise
