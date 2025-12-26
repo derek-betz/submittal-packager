@@ -19,7 +19,7 @@ jobs:
       - name: Validate BidTabsData version
         run: |
           if [ -z "${BIDTABSDATA_VERSION}" ]; then
-            echo "BIDTABSDATA_VERSION is required (set it as a repository variable)." 1>&2
+            echo "BIDTABSDATA_VERSION is required (set it under repository variables)." 1>&2
             exit 1
           fi
 

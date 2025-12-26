@@ -77,7 +77,7 @@ def extract_zip(zip_path: Path, destination: Path) -> None:
                 target_path = (dest_root / member.filename).resolve()
                 if not str(target_path).startswith(str(dest_root)):
                     raise SystemExit(f"Unsafe path in archive: {member.filename}")
-            zip_file.extractall(destination)
+                zip_file.extract(member, destination)
     except zipfile.BadZipFile as exc:
         raise SystemExit(f"Asset is not a valid zip archive: {exc}") from exc
 
@@ -110,7 +110,8 @@ def main() -> None:
     out_dir_parent.mkdir(parents=True, exist_ok=True)
 
     with tempfile.TemporaryDirectory(prefix="bidtabsdata_", dir=out_dir_parent) as tmpdir:
-        download_path = Path(tmpdir) / asset["name"]
+        asset_name = Path(asset.get("name") or "BidTabsData.zip").name
+        download_path = Path(tmpdir) / asset_name
         extract_root = Path(tmpdir) / "extract"
         extract_root.mkdir(parents=True, exist_ok=True)
 
@@ -120,17 +121,29 @@ def main() -> None:
         payload_root = locate_payload(extract_root)
         write_version_marker(payload_root, version)
 
+        staging_dir = out_dir_parent / f".{out_dir.name}.staging"
+        if staging_dir.exists():
+            shutil.rmtree(staging_dir)
+        payload_root.rename(staging_dir)
+
         backup_dir = out_dir_parent / f".{out_dir.name}.old"
         if backup_dir.exists():
             shutil.rmtree(backup_dir)
 
-        if out_dir.exists():
-            out_dir.rename(backup_dir)
-
-        payload_root.rename(out_dir)
-
-        if backup_dir.exists():
-            shutil.rmtree(backup_dir)
+        try:
+            if out_dir.exists():
+                out_dir.rename(backup_dir)
+            staging_dir.rename(out_dir)
+        except Exception:
+            if backup_dir.exists() and not out_dir.exists():
+                backup_dir.rename(out_dir)
+            raise
+        else:
+            if backup_dir.exists():
+                shutil.rmtree(backup_dir)
+        finally:
+            if staging_dir.exists() and staging_dir != out_dir:
+                shutil.rmtree(staging_dir)
 
     print(f"Wrote BidTabsData to {out_dir}")
 
