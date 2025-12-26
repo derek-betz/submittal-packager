@@ -10,6 +10,9 @@ env:
   BIDTABSDATA_REPO: derek-betz/BidTabsData
   BIDTABSDATA_OUT_DIR: data-sample/BidTabsData
 
+permissions:
+  contents: read
+
 jobs:
   fetch:
     runs-on: ubuntu-latest
