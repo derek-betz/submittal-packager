@@ -4,10 +4,11 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import sys
 import tempfile
 import zipfile
 from pathlib import Path
-from typing import Dict, Iterable, List
+from typing import Any, Dict, Iterable, List
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -42,7 +43,7 @@ def resolve_out_dir() -> Path:
     return Path(os.environ.get("BIDTABSDATA_OUT_DIR", DEFAULT_OUT_DIR))
 
 
-def fetch_release(repo: str, version: str, headers: Dict[str, str]) -> Dict:
+def fetch_release(repo: str, version: str, headers: Dict[str, str]) -> Dict[str, Any]:
     url = f"https://api.github.com/repos/{repo}/releases/tags/{version}"
     try:
         with urlopen(Request(url, headers=headers)) as response:
@@ -53,8 +54,8 @@ def fetch_release(repo: str, version: str, headers: Dict[str, str]) -> Dict:
         raise SystemExit(f"Failed to reach GitHub: {exc}") from exc
 
 
-def pick_asset(assets: Iterable[Dict]) -> Dict:
-    chosen: List[Dict] = [a for a in assets if a.get("name", "").lower().endswith(".zip")]
+def pick_asset(assets: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
+    chosen: List[Dict[str, Any]] = [a for a in assets if a.get("name", "").lower().endswith(".zip")]
     if not chosen:
         raise SystemExit("No zip release assets found to download")
     return chosen[0]
@@ -123,7 +124,7 @@ def main() -> None:
             raise SystemExit("Selected asset is missing a browser_download_url")
 
         asset_name = asset.get("name") or "BidTabsData.zip"
-        if "/" in asset_name or "\\" in asset_name:
+        if "/" in asset_name or "\\" in asset_name or "\x00" in asset_name:
             raise SystemExit("Selected asset name contains path separators")
         download_path = Path(tmpdir) / asset_name
         extract_root = Path(tmpdir) / "extract"
@@ -152,8 +153,8 @@ def main() -> None:
             if backup_dir.exists() and not out_dir.exists():
                 try:
                     backup_dir.rename(out_dir)
-                except OSError:
-                    pass
+                except OSError as restore_error:
+                    print(f"Failed to restore BidTabsData backup: {restore_error}", file=sys.stderr)
             raise
         else:
             if backup_dir.exists():
