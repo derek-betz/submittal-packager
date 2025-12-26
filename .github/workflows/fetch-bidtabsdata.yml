@@ -1,0 +1,37 @@
+name: Fetch BidTabsData
+
+on:
+  push:
+  pull_request:
+
+env:
+  PYTHON_VERSION: "3.11"
+  BIDTABSDATA_VERSION: ${{ vars.BIDTABSDATA_VERSION }}
+  BIDTABSDATA_REPO: derek-betz/BidTabsData
+  BIDTABSDATA_OUT_DIR: data-sample/BidTabsData
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate BidTabsData version
+        run: |
+          if [ -z "${BIDTABSDATA_VERSION}" ]; then
+            echo "BIDTABSDATA_VERSION is required (set it under repository variables)." 1>&2
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Fetch BidTabsData release asset
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/fetch_bidtabsdata.py
