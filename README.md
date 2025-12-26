@@ -48,6 +48,26 @@ pip install -e .[gui]
 submittal-packager-gui
 ```
 
+## BidTabsData sample dataset
+
+The BidTabsData sample bundle is downloaded from the [`derek-betz/BidTabsData`](https://github.com/derek-betz/BidTabsData) releases and unpacked into `data-sample/BidTabsData/`.
+
+1) Set the required release tag:
+   ```bash
+   export BIDTABSDATA_VERSION=<release tag>  # e.g. BIDTABSDATA_VERSION=v2025.01.01
+   ```
+2) (Optional) Override the source repository or output folder:
+   ```bash
+   export BIDTABSDATA_REPO=derek-betz/BidTabsData
+   export BIDTABSDATA_OUT_DIR=data-sample/BidTabsData
+   ```
+3) Fetch the dataset locally (uses `GITHUB_TOKEN` when provided to avoid rate limits):
+   ```bash
+   python scripts/fetch_bidtabsdata.py
+   ```
+
+The script writes `.bidtabsdata_version` inside the extracted folder so CI jobs can confirm which release is present. A minimal GitHub Actions workflow (`fetch-bidtabsdata.yml`) downloads the pinned release on pushes and pull requests; set the repository variable `BIDTABSDATA_VERSION` to the desired tag before running the workflow.
+
 ## Graphical User Interface
 
 The desktop client provides a guided workflow for INDOT reviewers and consultants:
