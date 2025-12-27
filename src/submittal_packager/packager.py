@@ -190,7 +190,7 @@ def _assign_package_paths(
         if folder:
             package_target = package_target / folder
         package_target = package_target / Path(entry.relative_path).name
-        entry.package_path = str(package_target)
+        entry.package_path = package_target.as_posix()
 
 
 def _folder_from_package_path(
@@ -484,7 +484,7 @@ def run_package(
         target = Path(package_root)
         if generated_folder:
             target = target / generated_folder
-        return str(target / path.name)
+        return (target / path.name).as_posix()
 
     generated_files: List[Tuple[Path, str, str]] = []
     generated_preview: List[Dict[str, str]] = []

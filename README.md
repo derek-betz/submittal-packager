@@ -34,6 +34,8 @@ The following packages are automatically installed when you set up the project:
 ## Quickstart
 
 ```bash
+powershell -ExecutionPolicy Bypass -File scripts/bootstrap.ps1
+
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .[test]
@@ -134,5 +136,5 @@ Update the `conventions` section of the configuration file. You can supply a new
 Run the unit tests with:
 
 ```bash
-pytest -q
+python scripts/run_tests.py -q
 ```
