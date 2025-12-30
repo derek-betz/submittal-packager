@@ -1,0 +1,18 @@
+version: 1
+name: road-engineering-distribution
+description: >
+  Ensure road-design engineering apps are built production-ready, user-friendly,
+  plug-and-play, with tight governance (sole authority to owner), staged
+  internal rollout, feedback loop, and eventual paid external distribution.
+owners:
+  - derek-betz
+requires_confirmation: false
+visibility: organization
+entrypoints:
+  - instructions.md
+context:
+  applies_to:
+    - repository
+    - pull_request
+    - issue
+    - discussion
