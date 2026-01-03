@@ -138,3 +138,8 @@ Run the unit tests with:
 ```bash
 python scripts/run_tests.py -q
 ```
+
+## Secrets
+
+The API_KEY/ directory is intentionally excluded from version control. Create it locally on each machine to store secrets.
+
